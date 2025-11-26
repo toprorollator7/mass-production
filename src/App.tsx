@@ -1,0 +1,217 @@
+import { Authenticated, Unauthenticated, useMutation, useQuery } from 'convex/react';
+import { api } from '../convex/_generated/api';
+import { useAuth } from '@workos-inc/authkit-react';
+import { useState } from 'react';
+import { PolarProducts } from './components/PolarProducts';
+import { PolarDashboard } from './components/PolarDashboard';
+import { PolarSuccess } from './components/PolarSuccess';
+
+type Page = 'home' | 'products' | 'dashboard' | 'success';
+
+export default function App() {
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const path = window.location.pathname;
+    if (path.includes('success')) return 'success';
+    if (path.includes('products')) return 'products';
+    if (path.includes('dashboard')) return 'dashboard';
+    return 'home';
+  });
+
+  const navigate = (page: Page) => {
+    setCurrentPage(page);
+    window.history.pushState({}, '', `/${page === 'home' ? '' : page}`);
+  };
+
+  return (
+    <>
+      <header className="sticky top-0 z-10 bg-light dark:bg-dark p-4 border-b-2 border-slate-200 dark:border-slate-800 flex flex-row justify-between items-center">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => navigate('home')}
+            className="text-xl font-bold hover:opacity-80"
+          >
+            Mass Production
+          </button>
+          <nav className="flex gap-4">
+            <button
+              onClick={() => navigate('products')}
+              className="hover:opacity-80 text-sm"
+            >
+              Products
+            </button>
+            <Authenticated>
+              <button
+                onClick={() => navigate('dashboard')}
+                className="hover:opacity-80 text-sm"
+              >
+                Dashboard
+              </button>
+            </Authenticated>
+          </nav>
+        </div>
+        <AuthButton />
+      </header>
+      <main className="min-h-screen">
+        {currentPage === 'home' && (
+          <div className="p-8 flex flex-col gap-16">
+            <h1 className="text-4xl font-bold text-center">
+              Convex + React + WorkOS AuthKit + Polar.sh
+            </h1>
+            <Authenticated>
+              <Content />
+            </Authenticated>
+            <Unauthenticated>
+              <div className="flex flex-col gap-8 w-96 mx-auto">
+                <p>Log in to see the numbers</p>
+                <AuthButton />
+              </div>
+            </Unauthenticated>
+          </div>
+        )}
+        {currentPage === 'products' && <PolarProducts />}
+        {currentPage === 'dashboard' && (
+          <>
+            <Authenticated>
+              <PolarDashboard />
+            </Authenticated>
+            <Unauthenticated>
+              <div className="p-8 flex flex-col gap-6 items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-md">
+                  <h2 className="text-3xl font-bold mb-4">Sign In Required</h2>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    Please sign in to view your dashboard.
+                  </p>
+                  <AuthButton />
+                </div>
+              </div>
+            </Unauthenticated>
+          </>
+        )}
+        {currentPage === 'success' && <PolarSuccess />}
+      </main>
+    </>
+  );
+}
+
+function AuthButton() {
+  const { user, signIn, signOut } = useAuth();
+
+  if (user) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="text-sm text-right">
+          <div className="font-medium">{user.email}</div>
+          <div className="text-xs opacity-70">User ID: {user.id}</div>
+        </div>
+        <button
+          onClick={() => signOut()}
+          className="bg-dark dark:bg-light text-light dark:text-dark text-sm px-4 py-2 rounded-md border-2"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => void signIn()}
+      className="bg-dark dark:bg-light text-light dark:text-dark text-sm px-4 py-2 rounded-md border-2"
+    >
+      Sign in
+    </button>
+  );
+}
+
+function Content() {
+  const { viewer, numbers } =
+    useQuery(api.myFunctions.listNumbers, {
+      count: 10,
+    }) ?? {};
+  const addNumber = useMutation(api.myFunctions.addNumber);
+
+  if (viewer === undefined || numbers === undefined) {
+    return (
+      <div className="mx-auto">
+        <p>loading... (consider a loading skeleton)</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-8 max-w-lg mx-auto">
+      <p>Welcome {viewer ?? 'Anonymous'}!</p>
+      <p>
+        Click the button below and open this page in another window - this data is persisted in the Convex cloud
+        database!
+      </p>
+      <p>
+        <button
+          className="bg-dark dark:bg-light text-light dark:text-dark text-sm px-4 py-2 rounded-md border-2"
+          onClick={() => {
+            void addNumber({ value: Math.floor(Math.random() * 10) });
+          }}
+        >
+          Add a random number
+        </button>
+      </p>
+      <p>Numbers: {numbers?.length === 0 ? 'Click the button!' : (numbers?.join(', ') ?? '...')}</p>
+      <p>
+        Edit{' '}
+        <code className="text-sm font-bold font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded-md">
+          convex/myFunctions.ts
+        </code>{' '}
+        to change your backend
+      </p>
+      <p>
+        Edit{' '}
+        <code className="text-sm font-bold font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded-md">
+          src/App.tsx
+        </code>{' '}
+        to change your frontend
+      </p>
+      <div className="flex flex-col">
+        <p className="text-lg font-bold">Useful resources:</p>
+        <div className="flex gap-2">
+          <div className="flex flex-col gap-2 w-1/2">
+            <ResourceCard
+              title="Convex docs"
+              description="Read comprehensive documentation for all Convex features."
+              href="https://docs.convex.dev/home"
+            />
+            <ResourceCard
+              title="Stack articles"
+              description="Learn about best practices, use cases, and more from a growing
+            collection of articles, videos, and walkthroughs."
+              href="https://www.typescriptlang.org/docs/handbook/2/basic-types.html"
+            />
+          </div>
+          <div className="flex flex-col gap-2 w-1/2">
+            <ResourceCard
+              title="Templates"
+              description="Browse our collection of templates to get started quickly."
+              href="https://www.convex.dev/templates"
+            />
+            <ResourceCard
+              title="Discord"
+              description="Join our developer community to ask questions, trade tips & tricks,
+            and show off your projects."
+              href="https://www.convex.dev/community"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResourceCard({ title, description, href }: { title: string; description: string; href: string }) {
+  return (
+    <div className="flex flex-col gap-2 bg-slate-200 dark:bg-slate-800 p-4 rounded-md h-28 overflow-auto">
+      <a href={href} className="text-sm underline hover:no-underline">
+        {title}
+      </a>
+      <p className="text-xs">{description}</p>
+    </div>
+  );
+}
